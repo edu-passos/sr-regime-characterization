@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Fig. 1 — Dual-layer concept-vector pipeline</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: #e8e8e6; display: flex; align-items: center; justify-content: center; min-height: 100vh; font-family: -apple-system, BlinkMacSystemFont, sans-serif; }
+    #__bundler_loading { position: fixed; bottom: 20px; right: 20px; font: 13px/1.4 -apple-system, BlinkMacSystemFont, sans-serif; color: #666; background: #fff; padding: 8px 14px; border-radius: 8px; box-shadow: 0 1px 4px rgba(0,0,0,0.12); z-index: 10000; }
+    #__bundler_thumbnail { position: fixed; inset: 0; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; background: #e8e8e6; z-index: 9999; }
+    #__bundler_thumbnail svg { width: 100%; height: 100%; object-fit: contain; }
+    #__bundler_placeholder { color: #999; font-size: 14px; }
+  </style>
+  <noscript>
+    <style>#__bundler_loading { display: none; }</style>
+    <div style="position:fixed;bottom:12px;left:12px;font:13px/1.4 -apple-system,BlinkMacSystemFont,sans-serif;color:#999;background:rgba(255,255,255,0.9);padding:6px 12px;border-radius:6px;box-shadow:0 1px 4px rgba(0,0,0,0.08);z-index:10000;">
+      This page requires JavaScript to display.
+    </div>
+  </noscript>
+</head>
+<body>
+  <div id="__bundler_thumbnail">
+  <svg viewBox="0 0 1200 800" xmlns="http://www.w3.org/2000/svg">
+    <rect x="0" y="200" width="336" height="400" fill="#ECF1F5"></rect>
+    <rect x="336" y="200" width="456" height="400" fill="#FBF5E6"></rect>
+    <rect x="792" y="200" width="408" height="400" fill="#FBEBDC"></rect>
+    <rect x="540" y="370" width="156" height="60" rx="6" fill="#ffffff" stroke="#5a5a5a" stroke-width="3"></rect>
+    <rect x="860" y="220" width="220" height="80" rx="6" fill="#E2ECF4" stroke="#4F90C0" stroke-width="3"></rect>
+    <rect x="860" y="420" width="220" height="80" rx="6" fill="#F6E2D1" stroke="#D88A55" stroke-width="3"></rect>
+    <rect x="900" y="520" width="180" height="40" rx="6" fill="#ECE6F1" stroke="#8E7CA8" stroke-width="3"></rect>
+    <text x="600" y="140" text-anchor="middle" font-family="Inter, sans-serif" font-size="44" fill="#1a1a1a">Fig. 1</text>
+  </svg>
+</div>
+  <div id="__bundler_loading">Unpacking...</div>
+
+  <script>
+    
+document.addEventListener('DOMContentLoaded', async function() {
+  const loading = document.getElementById('__bundler_loading');
+  function setStatus(msg) { if (loading) loading.textContent = msg; }
+
+  // Error sink persists across replaceWith since it's on window, not the DOM.
+  window.addEventListener('error', function(e) {
+    var p = document.body || document.documentElement;
+    var d = document.getElementById('__bundler_err') || p.appendChild(document.createElement('div'));
+    d.id = '__bundler_err';
+    d.style.cssText = 'position:fixed;bottom:12px;left:12px;right:12px;font:12px/1.4 ui-monospace,monospace;background:#2a1215;color:#ff8a80;padding:10px 14px;border-radius:8px;border:1px solid #5c2b2e;z-index:99999;white-space:pre-wrap;max-height:40vh;overflow:auto';
+    d.textContent = (d.textContent ? d.textContent + String.fromCharCode(10) : '') +
+      '[bundle] ' + (e.message || e.type) +
+      (e.filename ? ' (' + e.filename.slice(0, 60) + ':' + e.lineno + ')' : '');
+  }, true);
+
+  try {
+    const manifestEl = document.querySelector('script[type="__bundler/manifest"]');
+    const templateEl = document.querySelector('script[type="__bundler/template"]');
+    if (!manifestEl || !templateEl) {
+      setStatus('Error: missing bundle data');
+      console.error('[bundler] Missing script tags — manifestEl:', !!manifestEl, 'templateEl:', !!templateEl);
+      return;
+    }
+
+    const manifest = JSON.parse(manifestEl.textContent);
+    let template = JSON.parse(templateEl.textContent);
+
+    const uuids = Object.keys(manifest);
+    setStatus('Unpacking ' + uuids.length + ' assets...');
+
+    const blobUrls = {};
+    await Promise.all(uuids.map(async (uuid) => {
+      const entry = manifest[uuid];
+      try {
+        const binaryStr = atob(entry.data);
+        const bytes = new Uint8Array(binaryStr.length);
+        for (let i = 0; i < binaryStr.length; i++) bytes[i] = binaryStr.charCodeAt(i);
+
+        let finalBytes = bytes;
+        if (entry.compressed) {
+          if (typeof DecompressionStream !== 'undefined') {
+            const ds = new DecompressionStream('gzip');
+            const writer = ds.writable.getWriter();
+            const reader = ds.readable.getReader();
+            writer.write(bytes);
+            writer.close();
+            const chunks = [];
+            let totalLen = 0;
+            while (true) {
+              const { done, value } = await reader.read();
+              if (done) break;
+              chunks.push(value);
+              totalLen += value.length;
+            }
+            finalBytes = new Uint8Array(totalLen);
+            let offset = 0;
+            for (const chunk of chunks) { finalBytes.set(chunk, offset); offset += chunk.length; }
+          } else {
+            console.warn('DecompressionStream not available, asset ' + uuid + ' may not render');
+          }
+        }
+
+        blobUrls[uuid] = URL.createObjectURL(new Blob([finalBytes], { type: entry.mime }));
+      } catch (err) {
+        console.error('Failed to decode asset ' + uuid + ':', err);
+        blobUrls[uuid] = URL.createObjectURL(new Blob([], { type: entry.mime }));
+      }
+    }));
+
+    const extResEl = document.querySelector('script[type="__bundler/ext_resources"]');
+    const extResources = extResEl ? JSON.parse(extResEl.textContent) : [];
+    const resourceMap = {};
+    for (const entry of extResources) {
+      if (blobUrls[entry.uuid]) resourceMap[entry.id] = blobUrls[entry.uuid];
+    }
+
+    setStatus('Rendering...');
+    for (const uuid of uuids) template = template.split(uuid).join(blobUrls[uuid]);
+
+    // Strip integrity + crossorigin — blob URLs from a file:// document inherit
+    // a null origin, so crossorigin forces a CORS fetch that SRI then rejects.
+    // The manifest bytes are ours; SRI protects against CDN compromise, not this.
+    template = template.replace(/\s+integrity="[^"]*"/gi, '').replace(/\s+crossorigin="[^"]*"/gi, '');
+
+    const resourceScript = '<script>window.__resources = ' +
+      JSON.stringify(resourceMap).split('</' + 'script>').join('<\\/' + 'script>') +
+      ';</' + 'script>';
+    // Inject after <head> so the DOCTYPE stays first; prepending the script
+    // would push the parser into quirks mode. DOMParser always emits a <head>
+    // (synthesizing one if the source HTML omitted it) but may carry
+    // attributes through, so match the full opening tag. slice() rather than
+    // replace() keeps us clear of $-pattern substitution in resourceScript.
+    const headOpen = template.match(/<head[^>]*>/i);
+    if (headOpen) {
+      const i = headOpen.index + headOpen[0].length;
+      template = template.slice(0, i) + resourceScript + template.slice(i);
+    }
+
+    // Parse the template and swap the root element. Scripts inserted via
+    // DOMParser/replaceWith are inert per spec — re-create each with
+    // createElement so they execute, awaiting onload for src scripts to
+    // preserve ordering (React before ReactDOM before Babel before text/babel).
+    const doc = new DOMParser().parseFromString(template, 'text/html');
+    document.documentElement.replaceWith(doc.documentElement);
+    const dead = Array.from(document.scripts);
+    for (const old of dead) {
+      const s = document.createElement('script');
+      for (const a of old.attributes) s.setAttribute(a.name, a.value);
+      s.textContent = old.textContent;
+      // text/babel scripts with a src: fetch and inline. transformScriptTags
+      // does XHR against the src, but blob:null/ from a file:// origin is
+      // silently dropped. Inlining makes it a plain inline babel script,
+      // which transformScriptTags handles unconditionally.
+      if ((s.type === 'text/babel' || s.type === 'text/jsx') && s.src) {
+        const r = await fetch(s.src);
+        s.textContent = await r.text();
+        s.removeAttribute('src');
+      }
+      const p = s.src ? new Promise(function(r) { s.onload = s.onerror = r; }) : null;
+      old.replaceWith(s);
+      if (p) await p;
+    }
+    // Babel standalone auto-transforms type=text/babel on DOMContentLoaded,
+    // which fired before we swapped the document. Trigger manually if present.
+    if (window.Babel && typeof window.Babel.transformScriptTags === 'function') {
+      window.Babel.transformScriptTags();
+    }
+  } catch (err) {
+    setStatus('Error unpacking: ' + err.message);
+    console.error('Bundle unpack error:', err);
+  }
+});
+
+  </script>
+
+  <script type="__bundler/manifest">
+{}
+  </script>
+
+  <script type="__bundler/ext_resources">
+[]
+  </script>
+
+  <script type="__bundler/template">
+"<!DOCTYPE html>\n<html lang=\"en\"><head>\n<meta charset=\"utf-8\">\n<title>Fig. 1 — Dual-layer concept-vector pipeline<\u002Ftitle>\n<style>\n  :root{\n    --band-signal:  #ECF1F5;\n    --band-symbol:  #FBF5E6;\n    --band-concept: #FBEBDC;\n    --ink:    #1a1a1a;\n\n    --struct:  #4F90C0;\n    --struct-fill: #E2ECF4;\n    --behav:   #D88A55;\n    --behav-fill:  #F6E2D1;\n    --calib:   #8E7CA8;\n    --calib-fill:  #ECE6F1;\n  }\n\n  html,body{ background:#e8e8e6; margin:0; }\n  body{\n    font-family: \"Inter\", \"Helvetica Neue\", Helvetica, Arial, sans-serif;\n    color: var(--ink);\n    padding: 6px 0;\n    display:flex; flex-direction:column; align-items:center;\n    -webkit-font-smoothing: antialiased;\n  }\n  .page{\n    background:#fff;\n    width: 100%;\n    max-width: 1180px;\n    padding: 8px 0;\n    box-shadow: 0 1px 0 rgba(0,0,0,.04), 0 18px 40px -22px rgba(0,0,0,.18);\n    border: 1px solid #d6d6d2;\n    box-sizing: border-box;\n  }\n  svg{ display:block; width:100%; height:auto; }\n<\u002Fstyle>\n\n\n\n<\u002Fhead>\n<body>\n\n<div class=\"page\">\n<svg viewBox=\"0 0 220 52\" xmlns=\"http://www.w3.org/2000/svg\" font-family=\"Inter, Helvetica, Arial, sans-serif\">\n  <defs>\n    <marker id=\"arr\" viewBox=\"0 0 10 10\" refX=\"9\" refY=\"5\" markerWidth=\"5\" markerHeight=\"5\" orient=\"auto\">\n      <path d=\"M0,1.5 L10,5 L0,8.5 z\" fill=\"#444\"><\u002Fpath>\n    <\u002Fmarker>\n    <marker id=\"arrStruct\" viewBox=\"0 0 10 10\" refX=\"9\" refY=\"5\" markerWidth=\"5\" markerHeight=\"5\" orient=\"auto\">\n      <path d=\"M0,1.5 L10,5 L0,8.5 z\" fill=\"#4F90C0\"><\u002Fpath>\n    <\u002Fmarker>\n    <marker id=\"arrBehav\" viewBox=\"0 0 10 10\" refX=\"9\" refY=\"5\" markerWidth=\"5\" markerHeight=\"5\" orient=\"auto\">\n      <path d=\"M0,1.5 L10,5 L0,8.5 z\" fill=\"#D88A55\"><\u002Fpath>\n    <\u002Fmarker>\n    <marker id=\"arrCalib\" viewBox=\"0 0 10 10\" refX=\"9\" refY=\"5\" markerWidth=\"5\" markerHeight=\"5\" orient=\"auto\">\n      <path d=\"M0,1.5 L10,5 L0,8.5 z\" fill=\"#8E7CA8\"><\u002Fpath>\n    <\u002Fmarker>\n    <marker id=\"arrGrey\" viewBox=\"0 0 10 10\" refX=\"9\" refY=\"5\" markerWidth=\"5\" markerHeight=\"5\" orient=\"auto\">\n      <path d=\"M0,1.5 L10,5 L0,8.5 z\" fill=\"#9a9a9a\"><\u002Fpath>\n    <\u002Fmarker>\n\n    <style>\n      .band-title{ font-size: 3.8px; font-weight:600; letter-spacing:.5px; text-transform:uppercase; }\n      .band-title-signal { fill:#5a6b78; }\n      .band-title-symbol { fill:#8a7a55; }\n      .band-title-concept{ fill:#a5765a; }\n\n      .lbl       { font-size: 4.2px; fill:#1a1a1a; font-weight:500; }\n      .lbl-cal   { font-size: 3.6px; fill:#1a1a1a; font-weight:500; }\n      .lbl-sm    { font-size: 3.4px; fill:#3a3a3a; font-weight:400; }\n      .annot     { font-size: 3.2px; fill:#3a3a3a; font-weight:400; }\n      .vec-lbl   { font-size: 4.6px; fill:#1a1a1a; font-weight:500; }\n      .arrow     { stroke:#444; stroke-width:.4; fill:none; }\n      .arrow-grey{ stroke:#9a9a9a; stroke-width:.38; fill:none; stroke-dasharray:1.4,.9; }\n      .arrow-struct { stroke:#4F90C0; stroke-width:.48; fill:none; }\n      .arrow-behav  { stroke:#D88A55; stroke-width:.48; fill:none; }\n      .arrow-calib  { stroke:#8E7CA8; stroke-width:.48; fill:none; }\n\n      .box-up    { fill:#FFFFFF; stroke:#7a7a7a; stroke-width:.4; }\n      .box-sym   { fill:#FFFFFF; stroke:#5a5a5a; stroke-width:.5; }\n      .box-struct{ fill:var(--struct-fill); stroke:var(--struct); stroke-width:.48; }\n      .box-behav { fill:var(--behav-fill);  stroke:var(--behav);  stroke-width:.48; }\n      .box-calib { fill:var(--calib-fill);  stroke:var(--calib);  stroke-width:.48; }\n    <\u002Fstyle>\n  <\u002Fdefs>\n\n  <!-- background zones — flush to viewBox edges -->\n  <rect x=\"0\" y=\"0\" width=\"70\" height=\"52\" fill=\"var(--band-signal)\"><\u002Frect>\n  <rect x=\"70\" y=\"0\" width=\"95\" height=\"52\" fill=\"var(--band-symbol)\"><\u002Frect>\n  <rect x=\"165\" y=\"0\" width=\"55\" height=\"52\" fill=\"var(--band-concept)\"><\u002Frect>\n\n  <!-- band titles -->\n  <text class=\"band-title band-title-signal\" x=\"35\" y=\"4.5\" text-anchor=\"middle\">base level<\u002Ftext>\n  <text class=\"band-title band-title-symbol\" x=\"117.5\" y=\"4.5\" text-anchor=\"middle\">symbolic level<\u002Ftext>\n  <text class=\"band-title band-title-concept\" x=\"192.5\" y=\"4.5\" text-anchor=\"middle\">concept level<\u002Ftext>\n  <line x1=\"6\" y1=\"6.2\" x2=\"64\" y2=\"6.2\" stroke=\"#b6bdc4\" stroke-width=\".22\"><\u002Fline>\n  <line x1=\"76\" y1=\"6.2\" x2=\"159\" y2=\"6.2\" stroke=\"#c9bf9c\" stroke-width=\".22\"><\u002Fline>\n  <line x1=\"171\" y1=\"6.2\" x2=\"214\" y2=\"6.2\" stroke=\"#d8b598\" stroke-width=\".22\"><\u002Fline>\n\n  <!-- ============================================================\n       SIGNAL SPACE — three upstream blocks (h=18, y=27–45, centre y=36).\n       extraction → windowing → time-delay embedding\n       ============================================================ -->\n\n  <!-- 1. extraction: multivariate raw → single trace -->\n  <g transform=\"translate(1,16)\">\n    <text class=\"lbl-sm\" x=\"10\" y=\"-2\" text-anchor=\"middle\">time series<\u002Ftext>\n    <rect class=\"box-up\" x=\"0\" y=\"0\" width=\"20\" height=\"18\" rx=\"1.2\"><\u002Frect>\n    <g transform=\"translate(2.5,3)\">\n      <path d=\"M0,1.5 L1.6,0.8 L3.2,1.4 L4.8,0.6 L6.4,1.2 L8,0.7 L9.6,1.3 L11.2,0.9 L12.8,0.4 L14.4,1.1 L15,0.8\" fill=\"none\" stroke=\"#9aa6b2\" stroke-width=\".4\" stroke-linejoin=\"round\"><\u002Fpath>\n      <path d=\"M0,4.8 L1.6,5.4 L3.2,4.2 L4.8,4.9 L6.4,5.6 L8,4.7 L9.6,5.2 L11.2,4.4 L12.8,5.1 L14.4,4.6 L15,5.3\" fill=\"none\" stroke=\"#b0bcc6\" stroke-width=\".4\" stroke-linejoin=\"round\"><\u002Fpath>\n      <path d=\"M0,8.0 L1.6,7.3 L3.2,8.4 L4.8,7.6 L6.4,7.1 L8,8.2 L9.6,7.5 L11.2,8.1 L12.8,7.4 L14.4,7.9 L15,7.2\" fill=\"none\" stroke=\"#c4ced6\" stroke-width=\".4\" stroke-linejoin=\"round\"><\u002Fpath>\n      <path d=\"M7.5,9.2 L7.5,10.8\" stroke=\"#7a7a7a\" stroke-width=\".3\" marker-end=\"url(#arrGrey)\"><\u002Fpath>\n      <path d=\"M0,12.4 L2,11.4 L4,12.0 L6,10.8 L8,11.9 L10,11.0 L12,11.6 L14,10.7 L15,11.2\" fill=\"none\" stroke=\"#4F90C0\" stroke-width=\".55\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><\u002Fpath>\n    <\u002Fg>\n  <\u002Fg>\n\n  <!-- 2. windowing: trace with window markers -->\n  <g transform=\"translate(25,16)\">\n    <text class=\"lbl-sm\" x=\"10\" y=\"-2\" text-anchor=\"middle\">windowing<\u002Ftext>\n    <rect class=\"box-up\" x=\"0\" y=\"0\" width=\"20\" height=\"18\" rx=\"1.2\"><\u002Frect>\n    <g transform=\"translate(2.5,3.5)\">\n      <line x1=\"0\" y1=\"10\" x2=\"15\" y2=\"10\" stroke=\"#bcbcbc\" stroke-width=\".18\"><\u002Fline>\n      <path d=\"M0,7 L1.5,5.4 L3,3.8 L4.5,4.6 L6,6.4 L7.5,7.8 L9,6.6 L10.5,4.4 L12,2.9 L13.5,4.0 L15,5.5\" fill=\"none\" stroke=\"#4F90C0\" stroke-width=\".55\" stroke-linejoin=\"round\" stroke-linecap=\"round\"><\u002Fpath>\n      <line x1=\"4\" y1=\"0\" x2=\"4\" y2=\"11\" stroke=\"#3a3a3a\" stroke-width=\".35\" stroke-dasharray=\".8,.5\"><\u002Fline>\n      <line x1=\"11\" y1=\"0\" x2=\"11\" y2=\"11\" stroke=\"#3a3a3a\" stroke-width=\".35\" stroke-dasharray=\".8,.5\"><\u002Fline>\n      <rect x=\"4\" y=\"0\" width=\"7\" height=\"11\" fill=\"#4F90C0\" fill-opacity=\".10\"><\u002Frect>\n    <\u002Fg>\n  <\u002Fg>\n\n  <!-- 3. time-delay embedding -->\n  <g transform=\"translate(49,16)\">\n    <text class=\"lbl-sm\" x=\"10\" y=\"-4.5\" text-anchor=\"middle\">time delay<\u002Ftext>\n    <text class=\"lbl-sm\" x=\"10\" y=\"-1\" text-anchor=\"middle\">embedding<\u002Ftext>\n    <rect class=\"box-up\" x=\"0\" y=\"0\" width=\"20\" height=\"18\" rx=\"1.2\"><\u002Frect>\n    <g transform=\"translate(2.5,3.5)\">\n      <rect x=\"0\" y=\"0\" width=\"15\" height=\"2.5\" fill=\"#C9D5DF\" stroke=\"#7a7a7a\" stroke-width=\".15\"><\u002Frect>\n      <rect x=\"0\" y=\"2.8\" width=\"15\" height=\"2.5\" fill=\"#D7DEE5\" stroke=\"#7a7a7a\" stroke-width=\".15\"><\u002Frect>\n      <rect x=\"0\" y=\"5.6\" width=\"15\" height=\"2.5\" fill=\"#E2E6EB\" stroke=\"#7a7a7a\" stroke-width=\".15\"><\u002Frect>\n      <rect x=\"0\" y=\"8.4\" width=\"15\" height=\"2.5\" fill=\"#EDEFF2\" stroke=\"#7a7a7a\" stroke-width=\".15\"><\u002Frect>\n    <\u002Fg>\n  <\u002Fg>\n\n  <!-- inter-block arrows (centre line y=25) -->\n  <path class=\"arrow-grey\" d=\"M21.4,25 L24.4,25\" marker-end=\"url(#arrGrey)\"><\u002Fpath>\n  <path class=\"arrow-grey\" d=\"M45.4,25 L48.4,25\" marker-end=\"url(#arrGrey)\"><\u002Fpath>\n  <path class=\"arrow\" d=\"M69.4,25 L77.4,25\" marker-end=\"url(#arr)\"><\u002Fpath>\n\n  <!-- ============================================================\n       SYMBOLIC SPACE — SR block centred at y=36.\n       ============================================================ -->\n\n  <g transform=\"translate(78,16)\">\n    <rect class=\"box-sym\" x=\"0\" y=\"0\" width=\"32\" height=\"18\" rx=\"1.2\"><\u002Frect>\n    <text class=\"lbl\" x=\"16\" y=\"7.3\" text-anchor=\"middle\" dominant-baseline=\"middle\">symbolic<\u002Ftext>\n    <text class=\"lbl\" x=\"16\" y=\"12.3\" text-anchor=\"middle\" dominant-baseline=\"middle\">regression<\u002Ftext>\n  <\u002Fg>\n  <text class=\"lbl-sm\" x=\"94\" y=\"13.8\" text-anchor=\"middle\" fill=\"#5a5a5a\">candidate equation<\u002Ftext>\n\n  <!-- ============================================================\n       CONCEPT BOXES.\n       structural concepts:  y=11–27 (centre 19), h=16\n       behavioural concepts: y=39–55 (centre 47), h=16\n       + calibration:        y=58–65 (centre 61.5), h=7\n       ============================================================ -->\n\n  <g transform=\"translate(130,8)\">\n    <rect class=\"box-struct\" x=\"0\" y=\"0\" width=\"44\" height=\"14\" rx=\"1.2\"><\u002Frect>\n    <text class=\"lbl\" x=\"22\" y=\"7.5\" text-anchor=\"middle\" dominant-baseline=\"middle\">structural concepts<\u002Ftext>\n  <\u002Fg>\n\n  <g transform=\"translate(130,28)\">\n    <rect class=\"box-behav\" x=\"0\" y=\"0\" width=\"44\" height=\"14\" rx=\"1.2\"><\u002Frect>\n    <text class=\"lbl\" x=\"22\" y=\"7.5\" text-anchor=\"middle\" dominant-baseline=\"middle\">behavioural concepts<\u002Ftext>\n  <\u002Fg>\n\n  <g transform=\"translate(140,43)\">\n    <rect class=\"box-calib\" x=\"0\" y=\"0\" width=\"34\" height=\"5\" rx=\"1\"><\u002Frect>\n    <text class=\"lbl-cal\" x=\"17\" y=\"2.8\" text-anchor=\"middle\" dominant-baseline=\"middle\">+ gating<\u002Ftext>\n  <\u002Fg>\n  <path d=\"M157,42 L157,43\" stroke=\"#8E7CA8\" stroke-width=\".5\" fill=\"none\"><\u002Fpath>\n\n  <!-- SR fan-out arrows (only struct + behav) -->\n  <path class=\"arrow-struct\" d=\"M110,24 C118,24 122,19 130,15\" marker-end=\"url(#arrStruct)\"><\u002Fpath>\n  <path class=\"arrow-behav\" d=\"M110,26 C118,26 122,32 130,35\" marker-end=\"url(#arrBehav)\"><\u002Fpath>\n\n  <!-- linear baseline → calibration -->\n  <path class=\"arrow-grey\" d=\"M59,34 C72,48 110,50 140,45.5\" marker-end=\"url(#arrGrey)\"><\u002Fpath>\n  <text class=\"annot\" x=\"90\" y=\"42\" text-anchor=\"middle\" fill=\"#7a7a7a\" font-style=\"italic\">linear baseline<\u002Ftext>\n\n  <!-- ============================================================\n       CONCEPT VECTOR — 16 cells, 12 wide, 2.0 tall (h=32).\n       9 structural + 6 behavioural + 1 gating.\n       ============================================================ -->\n\n  <g transform=\"translate(196,11)\">\n    <rect x=\"-.5\" y=\"-.5\" width=\"13\" height=\"33\" fill=\"#FFFFFF\" stroke=\"#3a3a3a\" stroke-width=\".5\"><\u002Frect>\n\n    <g fill=\"#4F90C0\">\n      <rect x=\"0\" y=\"0\" width=\"12\" height=\"2\"><\u002Frect>\n      <rect x=\"0\" y=\"2\" width=\"12\" height=\"2\"><\u002Frect>\n      <rect x=\"0\" y=\"4\" width=\"12\" height=\"2\"><\u002Frect>\n      <rect x=\"0\" y=\"6\" width=\"12\" height=\"2\"><\u002Frect>\n      <rect x=\"0\" y=\"8\" width=\"12\" height=\"2\"><\u002Frect>\n      <rect x=\"0\" y=\"10\" width=\"12\" height=\"2\"><\u002Frect>\n      <rect x=\"0\" y=\"12\" width=\"12\" height=\"2\"><\u002Frect>\n      <rect x=\"0\" y=\"14\" width=\"12\" height=\"2\"><\u002Frect>\n      <rect x=\"0\" y=\"16\" width=\"12\" height=\"2\"><\u002Frect>\n    <\u002Fg>\n    <g stroke=\"#FFFFFF\" stroke-width=\".3\">\n      <line x1=\"0\" y1=\"2\" x2=\"12\" y2=\"2\"><\u002Fline>\n      <line x1=\"0\" y1=\"4\" x2=\"12\" y2=\"4\"><\u002Fline>\n      <line x1=\"0\" y1=\"6\" x2=\"12\" y2=\"6\"><\u002Fline>\n      <line x1=\"0\" y1=\"8\" x2=\"12\" y2=\"8\"><\u002Fline>\n      <line x1=\"0\" y1=\"10\" x2=\"12\" y2=\"10\"><\u002Fline>\n      <line x1=\"0\" y1=\"12\" x2=\"12\" y2=\"12\"><\u002Fline>\n      <line x1=\"0\" y1=\"14\" x2=\"12\" y2=\"14\"><\u002Fline>\n      <line x1=\"0\" y1=\"16\" x2=\"12\" y2=\"16\"><\u002Fline>\n    <\u002Fg>\n\n    <g fill=\"#D88A55\">\n      <rect x=\"0\" y=\"18\" width=\"12\" height=\"2\"><\u002Frect>\n      <rect x=\"0\" y=\"20\" width=\"12\" height=\"2\"><\u002Frect>\n      <rect x=\"0\" y=\"22\" width=\"12\" height=\"2\"><\u002Frect>\n      <rect x=\"0\" y=\"24\" width=\"12\" height=\"2\"><\u002Frect>\n      <rect x=\"0\" y=\"26\" width=\"12\" height=\"2\"><\u002Frect>\n      <rect x=\"0\" y=\"28\" width=\"12\" height=\"2\"><\u002Frect>\n    <\u002Fg>\n    <g stroke=\"#FFFFFF\" stroke-width=\".3\">\n      <line x1=\"0\" y1=\"20\" x2=\"12\" y2=\"20\"><\u002Fline>\n      <line x1=\"0\" y1=\"22\" x2=\"12\" y2=\"22\"><\u002Fline>\n      <line x1=\"0\" y1=\"24\" x2=\"12\" y2=\"24\"><\u002Fline>\n      <line x1=\"0\" y1=\"26\" x2=\"12\" y2=\"26\"><\u002Fline>\n      <line x1=\"0\" y1=\"28\" x2=\"12\" y2=\"28\"><\u002Fline>\n    <\u002Fg>\n\n    <rect x=\"0\" y=\"30\" width=\"12\" height=\"2\" fill=\"#8E7CA8\"><\u002Frect>\n\n    <line x1=\"-.5\" y1=\"18\" x2=\"12.5\" y2=\"18\" stroke=\"#3a3a3a\" stroke-width=\".5\"><\u002Fline>\n    <line x1=\"-.5\" y1=\"30\" x2=\"12.5\" y2=\"30\" stroke=\"#3a3a3a\" stroke-width=\".5\"><\u002Fline>\n  <\u002Fg>\n\n  <!-- merge arrows -->\n  <path class=\"arrow-struct\" d=\"M174,15 C184,15 188,18 196,20\" marker-end=\"url(#arrStruct)\"><\u002Fpath>\n  <path class=\"arrow-behav\" d=\"M174,35 C184,35 189,35 196,35\" marker-end=\"url(#arrBehav)\"><\u002Fpath>\n  <path class=\"arrow-calib\" d=\"M174,45.5 C184,45.5 190,43 196,41\" marker-end=\"url(#arrCalib)\"><\u002Fpath>\n\n  <text class=\"lbl-sm\" x=\"202\" y=\"49\" text-anchor=\"middle\" fill=\"#5a5a5a\">concept vector<\u002Ftext>\n\n<\u002Fsvg>\n<\u002Fdiv>\n\n\n<\u002Fbody><\u002Fhtml>"
+  </script>
+</body>
+</html>

@@ -1,0 +1,17 @@
+# Pinned versions used to produce the results in the paper.
+# Install the package and these pins into a fresh environment:
+#   python3 -m venv .venv && .venv/bin/pip install -r requirements-lock.txt && .venv/bin/pip install -e .
+# PySR also needs a Julia runtime; it installs and compiles its backend on first use.
+numpy==2.4.2
+pandas==2.3.3
+scipy==1.17.0
+scikit-learn==1.8.0
+matplotlib==3.10.8
+pysr==1.5.9
+# Classical baselines (the [baselines] extra)
+nolds==0.6.3
+antropy==0.2.2
+# Sleep-EDF dataset build (the [data] extra)
+mne==1.11.0
+# Tests (the [dev] extra)
+pytest==9.0.2
