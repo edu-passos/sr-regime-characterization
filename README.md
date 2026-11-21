@@ -3,7 +3,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](pyproject.toml)
 
-Code for the paper *Symbolic Regression for Interpretable Time Series Regime Characterization* (Passos, Inácio, Santos, and Soares).
+Code for the paper [*Symbolic Regression for Interpretable Time Series Regime Characterization*](https://link.springer.com/chapter/10.1007/978-3-032-41086-3_29) (Passos, Inácio, Santos, and Soares).
 
 A regime is a stretch of a time series whose dynamics differ from the stretches around it. This repo characterizes how two regimes differ, rather than only locating where they change. It fits a set of symbolic regression expressions to each window and extracts two families of concepts from them: structural concepts from the structure of the expressions (lag order, multiplicative interaction, nonlinearity, complexity) and behavioral concepts from their gradients and curvature. A gating step turns off the nonlinearity reading on windows that a linear baseline already explains, so a near-linear window fitted with nonlinear operators does not register as nonlinear.
 
